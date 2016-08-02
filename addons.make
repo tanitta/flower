@@ -1,2 +1,4 @@
 ofxAssimpModelLoader
 ofxOsc
+ofxLitSphere
+ofxPostGlitch
