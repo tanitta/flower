@@ -75,7 +75,7 @@ void ofApp::setup(){
 	_accentMaterial->loadAt(19);
 	
 	ofEnableArbTex();
-	_fbo.allocate(512, 512);
+	_fbo.allocate(512, 512, GL_RGBA, 4);
 	_glitch.setup(&_fbo);
 	
 	_glitch.setFx(OFXPOSTGLITCH_GLOW           , true);
@@ -214,7 +214,7 @@ void ofApp::mouseExited(int x, int y){
 //--------------------------------------------------------------
 void ofApp::windowResized(int w, int h){
 	ofEnableArbTex();
-	_fbo.allocate(w, h);
+	_fbo.allocate(w, h, GL_RGBA, 4);
 	_glitch.setup(&_fbo);
 }
 
