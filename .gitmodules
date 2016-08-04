@@ -1,0 +1,3 @@
+[submodule "src/pharticle"]
+	path = src/pharticle
+	url = git@github.com:tanitta/pharticle.git
