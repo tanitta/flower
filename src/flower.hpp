@@ -4,17 +4,9 @@
 #include "petal.hpp"
 
 namespace flower {
+using Material = std::shared_ptr<ofxLitSphere>;
 class Flower {
-	using Material = std::shared_ptr<ofxLitSphere>;
 	public:
-		Flower(Material& base, Material& asort, Material& accent, const ofVec3f& position){
-			_baseMaterial   = base;
-			_asortMaterial  = asort;
-			_accentMaterial = accent;
-			
-			_position = position;
-		};
-	
 		Flower(
 			Material& base,
 			Material& asort,
@@ -26,11 +18,23 @@ class Flower {
 				center += petal->position();
 			}
 			center /= array.size();
-			
+			Flower(base, asort, accent, center, array);
+		};
+		
+		Flower(
+			Material& base,
+			Material& asort,
+			Material& accent,
+			ofVec3f position,
+			std::vector<std::shared_ptr<flower::Petal>>& array
+		){
 			for (int i = 0; i < array.size(); i++) {
+				float rad = 2.0*PI*float(i)/float(array.size());
+					
 				auto&& petal = array[i];
-				petal->position(center)
-				      .orientation(
+				petal->position(position+ofVec3f(sin(rad), 0, cos(rad))*10.0f)
+					.orientation(
+							  ofQuaternion(10.0f, ofVec3f(0, 0, 1))*
 							  ofQuaternion(30.0f, ofVec3f(1, 0, 0))*
 							  ofQuaternion(360.0f*float(i)/float(array.size()),ofVec3f(0, 1, 0)));
 				// if(i == 0){
@@ -42,8 +46,7 @@ class Flower {
 					petal->material(accent);
 				};
 			}
-			
-			Flower(base, asort, accent, center);
+			updateProperties(base, asort, accent, position);
 		};
 		
 		virtual ~Flower(){};
@@ -74,6 +77,7 @@ class Flower {
 		ofVec3f position()const{return _position;};
 		ofQuaternion orientation()const{return _orientation;};
 
+		bool shouldDie = false;
 	private:
 		std::vector<std::shared_ptr<flower::Petal>> _petals;
 		
@@ -83,5 +87,27 @@ class Flower {
 		
 		ofVec3f _position;
 		ofQuaternion _orientation;
+		
+		void updateProperties(Material& base, Material& asort, Material& accent, const ofVec3f& position){
+			_baseMaterial   = base;
+			_asortMaterial  = asort;
+			_accentMaterial = accent;
+			
+			_position = position;
+		}
 };
+
+void addFlower(std::vector<std::shared_ptr<flower::Petal>>& targetPetals, Material& base, Material& asort, Material& accent, const ofVec3f& position, const size_t numPetals){
+	std::vector<std::shared_ptr<flower::Petal>> petals;
+	for (int i = 0; i < numPetals; i++) {
+		petals.push_back(std::shared_ptr<flower::Petal>(new flower::Petal(base)));
+	}
+	
+	Flower flower(base, asort, accent, position, petals);
+	
+	for (auto&& petal : petals){
+		targetPetals.push_back(petal);
+	}
+}
+
 } // namespace flower

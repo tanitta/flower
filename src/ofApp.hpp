@@ -1,12 +1,14 @@
 #pragma once
 
 #include "ofMain.h"
+#include "pharticle/pharticle.hpp";
 #include "resources.hpp"
 #include "ofxAssimpModelLoader.h"
 #include "ofxLitSphere.h"
 #include "ofxPostGlitch.h"
 
 #include "flower.hpp"
+#include "emitter.hpp"
 
 class ofApp : public ofBaseApp{
 	using Material = std::shared_ptr<ofxLitSphere>;
@@ -28,23 +30,52 @@ class ofApp : public ofBaseApp{
 		void gotMessage(ofMessage msg);
 		
 	private:
-		void setupPetals();
-		
 		ofEasyCam     _camera;
+		ofxPostGlitch _glitch;
+		ofFbo         _fbo;
 		
 		Material _baseMaterial;
 		Material _asortMaterial;
 		Material _accentMaterial;
 		
-		ofxPostGlitch _glitch;
-		ofFbo         _fbo;
-		float _angle;
+		std::vector<std::shared_ptr<flower::Petal>>   _petals;
+		std::vector<std::shared_ptr<flower::Emitter>> _emitters;
 		
-		std::vector<std::shared_ptr<flower::Petal>> _petals;
+		Eigen::Vector3d _petalsCenter;
+		
+		pharticle::Engine _engine;
+		
+		void setupPetals();
+		void setupEmitters();
+		
+		void updatePetals();
+		void updateEmitters();
 };
 
 //--------------------------------------------------------------
 void ofApp::setup(){
+	_engine.set_collision_reaction_force([&](pharticle::Particle& p1, pharticle::Particle& p2){
+		// //separation
+		// Eigen::Vector3d separationForce = Eigen::Vector3d(0.0, 0.0, 0.0);
+		// auto distance = (p2.position_ - p1.position_).norm();
+		// if(distance < 200.0){
+		// 	auto n = (p2.position_ - p1.position_).normalized();
+		// 	auto depth = 200.0 - distance;
+		// 	separationForce = depth*n*0.05;
+		// };
+		//
+		// //alignment
+		// Eigen::Vector3d alignmentForce = Eigen::Vector3d(0.0, 0.0, 0.0);
+		// alignmentForce = (p2.velocity_ - p1.velocity_)*0.02;
+		// std::cout<<separationForce+alignmentForce<<std::endl;
+		// // if(distance < 100.0){
+		// // 	// Eigen::Vector3d alignmentForce = -(p2.velocity_ - p1.velocity_)*0.01;
+		// // }
+		//
+		// Eigen::Vector3d force = separationForce + alignmentForce;
+		// return force;
+		return Eigen::Vector3d(0, 0, 0);
+	});
 	
     ofEnableDepthTest();
     ofSetVerticalSync(true);
@@ -82,9 +113,8 @@ void ofApp::setup(){
 	_glitch.setFx(OFXPOSTGLITCH_SHAKER         , true);
 	_glitch.setFx(OFXPOSTGLITCH_CR_HIGHCONTRAST, true);
 	
-	_angle = 0.0f;
-	
 	setupPetals();
+	setupEmitters();
 }
 
 void ofApp::setupPetals(){
@@ -101,8 +131,16 @@ void ofApp::setupPetals(){
 	flower::Flower flower(_baseMaterial, _asortMaterial, _accentMaterial, _petals);
 }
 
+void ofApp::setupEmitters(){
+	for (int i = 0; i < 3; i++){
+		auto emitter = std::shared_ptr<flower::Emitter>(new flower::Emitter(_petals));
+		_emitters.push_back(emitter);
+	}
+}
 //--------------------------------------------------------------
 void ofApp::update(){
+	updatePetals();
+	
 	_fbo.begin();
 	_camera.begin();
 	ofBackground(220);
@@ -122,8 +160,21 @@ void ofApp::update(){
 	}
 	_camera.end();
 	_fbo.end();
+}
 
-	_angle += 0.1f;
+void ofApp::updatePetals(){
+	int id = 0;
+	for (auto& petal : _petals) {
+		petal->particle().id_ = id;
+		_engine.add(petal->particle());
+		id++;
+	}
+	
+	_engine.update();
+}
+
+void ofApp::updateEmitters(){
+	
 }
 
 //--------------------------------------------------------------
@@ -194,6 +245,7 @@ void ofApp::mousePressed(int x, int y, int button){
 	ofDisableArbTex();
     // _litSphere.loadNext();
 	ofEnableArbTex();
+	flower::addFlower(_petals, _baseMaterial, _asortMaterial, _accentMaterial, ofVec3f(ofRandom(-500, 500), ofRandom(-500, 500), ofRandom(-500, 500)), 5);
 }
 
 //--------------------------------------------------------------
@@ -227,3 +279,21 @@ void ofApp::gotMessage(ofMessage msg){
 void ofApp::dragEvent(ofDragInfo dragInfo){ 
 
 }
+
+// namespace flower {
+// namespace boids {
+// 	Eigen::Vector3d separation(pharticle::Particle& p1, pharticle::Particle& p2, double distance){
+// 		auto n = (p2.position_ - p1.position_).normalized();
+// 		auto depth = (p2.position_ - n*p2.radius_) - (p1.position_ - n*p1.radius_);
+// 		return depth*0.1;
+// 	}
+//	
+// 	Eigen::Vector3d alignment(pharticle::Particle& p1, pharticle::Particle& p2){
+// 		return Eigen::Vector3d(0, 0, 0);
+// 	}
+//	
+// 	Eigen::Vector3d cohesion(pharticle::Particle& p1, pharticle::Particle& p2){
+// 		return Eigen::Vector3d(0, 0, 0);
+// 	}
+// } // namespace boids
+// } // namespace flower
