@@ -97,7 +97,14 @@ class Flower {
 		}
 };
 
-void addFlower(std::vector<std::shared_ptr<flower::Petal>>& targetPetals, Material& base, Material& asort, Material& accent, const ofVec3f& position, const size_t numPetals){
+void addFlower(
+	std::vector<std::shared_ptr<flower::Petal>>& targetPetals,
+	Material& base,
+	Material& asort,
+	Material& accent,
+	const ofVec3f& position,
+	const size_t numPetals
+){
 	std::vector<std::shared_ptr<flower::Petal>> petals;
 	for (int i = 0; i < numPetals; i++) {
 		petals.push_back(std::shared_ptr<flower::Petal>(new flower::Petal(base)));

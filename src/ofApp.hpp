@@ -50,6 +50,14 @@ class ofApp : public ofBaseApp{
 		
 		void updatePetals();
 		void updateEmitters();
+		void updateParticles();
+		
+		void drawPetals();
+		void drawEmitters();
+		
+		void addForce(pharticle::Particle& particle, Eigen::Vector3d force);
+		void addForce(pharticle::Particle& particle, ofVec3f force);
+		double _unitTime = 1.0;
 };
 
 //--------------------------------------------------------------
@@ -118,32 +126,83 @@ void ofApp::setup(){
 }
 
 void ofApp::setupPetals(){
-	for (int i = 0; i < 6; i++) {
-		auto p = std::shared_ptr<flower::Petal>(new flower::Petal(_baseMaterial));
-		const auto x = ofRandom(-200, 200);
-		const auto y = ofRandom(-200, 200);
-		const auto z = ofRandom(-200, 200);
-		p->position(ofVec3f(x, y, z))
-	      .orientation(ofQuaternion(ofRandom(-PI, PI)*100.0f, ofVec3f(x, y, z).normalized()));
-		_petals.push_back(p);
-	}
-	
-	flower::Flower flower(_baseMaterial, _asortMaterial, _accentMaterial, _petals);
+	// for (int i = 0; i < 6; i++) {
+	// 	auto p = std::shared_ptr<flower::Petal>(new flower::Petal(_baseMaterial));
+	// 	const auto x = ofRandom(-200, 200);
+	// 	const auto y = ofRandom(-200, 200);
+	// 	const auto z = ofRandom(-200, 200);
+	// 	p->position(ofVec3f(x, y, z))
+	//       .orientation(ofQuaternion(ofRandom(-PI, PI)*100.0f, ofVec3f(x, y, z).normalized()));
+	// 	_petals.push_back(p);
+	// }
+	//
+	// flower::Flower flower(_baseMaterial, _asortMaterial, _accentMaterial, _petals);
 }
 
 void ofApp::setupEmitters(){
 	for (int i = 0; i < 3; i++){
-		auto emitter = std::shared_ptr<flower::Emitter>(new flower::Emitter(_petals));
+		auto emitter = std::shared_ptr<flower::Emitter>(new flower::Emitter(
+			_petals,
+			_baseMaterial,
+			_asortMaterial,
+			_accentMaterial,
+			ofVec3f(i*100, 0, 0), 
+			5
+		));
 		_emitters.push_back(emitter);
 	}
 }
 //--------------------------------------------------------------
 void ofApp::update(){
 	updatePetals();
+	updateEmitters();
+	updateParticles();
 	
 	_fbo.begin();
 	_camera.begin();
-	ofBackground(220);
+	ofBackground(0, 0, 255);
+	
+	drawPetals();
+	drawEmitters();
+	
+	_camera.end();
+	_fbo.end();
+}
+
+void ofApp::updatePetals(){
+}
+
+void ofApp::updateEmitters(){
+}
+
+void ofApp::updateParticles(){
+	std::vector<pharticle::Particle*> particles;
+	
+	int id = 0;
+	for (auto& petal : _petals) {
+		particles.push_back(&petal->particle());
+	}
+	
+	for (auto& emitter: _emitters) {
+		particles.push_back(&emitter->particle());
+	}
+	
+	for (auto&& p : particles) {
+		double distance = p->position_.norm();
+		Eigen::Vector3d n = p->position_.normalized();
+		Eigen::Vector3d vis = p->velocity_.dot(n) * n;
+		Eigen::Vector3d force = (500-distance) * n * 0.1 - vis;
+		addForce(*p, force);
+	}
+	
+	// integrate
+	for (auto&& p : particles) {
+		p->integrate();
+		p->acceleration_ << 0,0,0;
+	}
+}
+
+void ofApp::drawPetals(){
 	for (auto&& petal : _petals) {
 		ofPushMatrix();
 		
@@ -158,23 +217,29 @@ void ofApp::update(){
 		
 		ofPopMatrix();
 	}
-	_camera.end();
-	_fbo.end();
 }
 
-void ofApp::updatePetals(){
-	int id = 0;
-	for (auto& petal : _petals) {
-		petal->particle().id_ = id;
-		_engine.add(petal->particle());
-		id++;
+void ofApp::drawEmitters(){
+	for (auto&& emitter: _emitters) {
+		ofPushMatrix();
+		
+		ofTranslate(emitter->position());
+		
+		auto n = emitter->position().normalized();
+		ofQuaternion q;
+		q.makeRotate(ofVec3f(0, -1, 0), n);
+		std::cout<<q<<std::endl;
+		
+		ofVec3f qAxsis;
+		float   angle;
+		// emitter->orientation().getRotate(angle, qAxsis);
+		q.getRotate(angle, qAxsis);
+		ofRotate(angle, qAxsis.x, qAxsis.y, qAxsis.z);
+		
+		emitter->draw();
+		
+		ofPopMatrix();
 	}
-	
-	_engine.update();
-}
-
-void ofApp::updateEmitters(){
-	
 }
 
 //--------------------------------------------------------------
@@ -245,7 +310,19 @@ void ofApp::mousePressed(int x, int y, int button){
 	ofDisableArbTex();
     // _litSphere.loadNext();
 	ofEnableArbTex();
-	flower::addFlower(_petals, _baseMaterial, _asortMaterial, _accentMaterial, ofVec3f(ofRandom(-500, 500), ofRandom(-500, 500), ofRandom(-500, 500)), 5);
+	// flower::addFlower(_petals, _baseMaterial, _asortMaterial, _accentMaterial, ofVec3f(ofRandom(-500, 500), ofRandom(-500, 500), ofRandom(-500, 500)), 5);
+	// _emitters.push_back();
+	
+	ofVec3f randomPoint(ofRandom(-500, 500), ofRandom(-500, 500), ofRandom(-500, 500));
+	auto emitter = std::shared_ptr<flower::Emitter>(new flower::Emitter(
+		_petals,
+		_baseMaterial,
+		_asortMaterial,
+		_accentMaterial,
+		randomPoint, 
+		5
+	));
+	_emitters.push_back(emitter);
 }
 
 //--------------------------------------------------------------
@@ -278,6 +355,14 @@ void ofApp::gotMessage(ofMessage msg){
 //--------------------------------------------------------------
 void ofApp::dragEvent(ofDragInfo dragInfo){ 
 
+}
+
+void ofApp::addForce(pharticle::Particle& particle, Eigen::Vector3d force){
+	particle.velocity_ += force/particle.mass_*_unitTime;
+}
+
+void ofApp::addForce(pharticle::Particle& particle, ofVec3f force){
+	addForce(particle, Eigen::Vector3d(force.x, force.y, force.z));
 }
 
 // namespace flower {
