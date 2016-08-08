@@ -107,7 +107,7 @@ void addFlower(
 ){
 	std::vector<std::shared_ptr<flower::Petal>> petals;
 	for (int i = 0; i < numPetals; i++) {
-		petals.push_back(std::shared_ptr<flower::Petal>(new flower::Petal(base)));
+		petals.push_back(std::shared_ptr<flower::Petal>(new flower::Petal(base, 100)));
 	}
 	
 	Flower flower(base, asort, accent, position, petals);

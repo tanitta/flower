@@ -8,15 +8,25 @@ class Petal {
 	using Material = std::shared_ptr<ofxLitSphere>;
 	
 	public:
-		Petal(Material& m):_material(m){
+		Petal(Material& m, double age):_material(m), _age(age){
 			// _particle.radius_ = 50.0f;
+			_particle.mass_ = 2;
 		};
 		virtual ~Petal(){};
-		
+
+		void update(){
+			if(_age>0){
+				_age-=1.0;
+			}else{
+				shouldDie = true;
+			}
+		}
+
 		void draw(){
 			_material->begin();
 			flower::Resources::elem("petal.x")->drawFaces();
-			ofDrawAxis(100.0f);
+			// flower::Resources::elem("petal.x")->drawWireframe();
+			// ofDrawAxis(100.0f);
 			_material->end();
 		}
 
@@ -48,9 +58,13 @@ class Petal {
 			return _particle;
 		}
 		
+		bool shouldDie = false;
+		
 	private:
 		ofQuaternion _orientation;
 		Material _material;
 		pharticle::Particle _particle;
+		
+		double _age;
 };
 }

@@ -62,28 +62,27 @@ class ofApp : public ofBaseApp{
 
 //--------------------------------------------------------------
 void ofApp::setup(){
-	_engine.set_collision_reaction_force([&](pharticle::Particle& p1, pharticle::Particle& p2){
-		// //separation
-		// Eigen::Vector3d separationForce = Eigen::Vector3d(0.0, 0.0, 0.0);
-		// auto distance = (p2.position_ - p1.position_).norm();
-		// if(distance < 200.0){
-		// 	auto n = (p2.position_ - p1.position_).normalized();
-		// 	auto depth = 200.0 - distance;
-		// 	separationForce = depth*n*0.05;
-		// };
-		//
-		// //alignment
-		// Eigen::Vector3d alignmentForce = Eigen::Vector3d(0.0, 0.0, 0.0);
-		// alignmentForce = (p2.velocity_ - p1.velocity_)*0.02;
-		// std::cout<<separationForce+alignmentForce<<std::endl;
-		// // if(distance < 100.0){
-		// // 	// Eigen::Vector3d alignmentForce = -(p2.velocity_ - p1.velocity_)*0.01;
-		// // }
-		//
-		// Eigen::Vector3d force = separationForce + alignmentForce;
-		// return force;
-		return Eigen::Vector3d(0, 0, 0);
-	});
+	// _engine.set_collision_reaction_force([&](pharticle::Particle& p1, pharticle::Particle& p2){
+	// 	//separation
+	// 	Eigen::Vector3d separationForce = Eigen::Vector3d(0.0, 0.0, 0.0);
+	// 	auto distance = p2.radius_+p1.radius_ - (p2.position_ - p1.position_).norm();
+	// 	auto n = (p2.position_ - p1.position_).normalized();
+	// 	separationForce = distance*n*0.05;
+	// 	// if(distance < 200.0){
+	// 	// };
+	// 	//
+	// 	// //alignment
+	// 	// Eigen::Vector3d alignmentForce = Eigen::Vector3d(0.0, 0.0, 0.0);
+	// 	// alignmentForce = (p2.velocity_ - p1.velocity_)*0.02;
+	// 	// std::cout<<separationForce+alignmentForce<<std::endl;
+	// 	// // if(distance < 100.0){
+	// 	// // 	// Eigen::Vector3d alignmentForce = -(p2.velocity_ - p1.velocity_)*0.01;
+	// 	// // }
+	// 	//
+	// 	// Eigen::Vector3d force = separationForce + alignmentForce;
+	// 	// return force;
+	// 	return separationForce;
+	// });
 	
     ofEnableDepthTest();
     ofSetVerticalSync(true);
@@ -109,9 +108,9 @@ void ofApp::setup(){
 	//19: white
 	//20: mat black
 	//21: red and white
-	_baseMaterial->loadAt(19);
-	_asortMaterial->loadAt(19);
-	_accentMaterial->loadAt(19);
+	_baseMaterial->loadAt(12);
+	_asortMaterial->loadAt(12);
+	_accentMaterial->loadAt(17);
 	
 	ofEnableArbTex();
 	_fbo.allocate(512, 512, GL_RGBA, 4);
@@ -120,6 +119,9 @@ void ofApp::setup(){
 	_glitch.setFx(OFXPOSTGLITCH_GLOW           , true);
 	_glitch.setFx(OFXPOSTGLITCH_SHAKER         , true);
 	_glitch.setFx(OFXPOSTGLITCH_CR_HIGHCONTRAST, true);
+	
+	
+	ofSetLineWidth(4);
 	
 	setupPetals();
 	setupEmitters();
@@ -147,7 +149,9 @@ void ofApp::setupEmitters(){
 			_asortMaterial,
 			_accentMaterial,
 			ofVec3f(i*100, 0, 0), 
-			5
+			300, 
+			5,
+			1
 		));
 		_emitters.push_back(emitter);
 	}
@@ -160,7 +164,9 @@ void ofApp::update(){
 	
 	_fbo.begin();
 	_camera.begin();
-	ofBackground(0, 0, 255);
+	// ofBackground(0, 0, 255);
+	
+	ofBackground(128, 128, 255);
 	
 	drawPetals();
 	drawEmitters();
@@ -170,15 +176,38 @@ void ofApp::update(){
 }
 
 void ofApp::updatePetals(){
+	for (auto&& petal: _petals) {
+		petal->update();
+	}
+	
+	std::vector<std::shared_ptr<flower::Petal>> petals_tmp;
+	for (auto&& petal: _petals) {
+		if(!petal->shouldDie){
+			petals_tmp.push_back(petal);
+		}
+	}
+	_petals = petals_tmp;
 }
 
 void ofApp::updateEmitters(){
+	for (auto&& emitter: _emitters) {
+		emitter->update();
+	}
+	
+	std::vector<std::shared_ptr<flower::Emitter>> emitters_tmp;
+	for (auto&& emitter: _emitters) {
+		if(!emitter->shouldDie){
+			emitters_tmp.push_back(emitter);
+		}
+	}
+	_emitters = emitters_tmp;
+	
+	
 }
 
 void ofApp::updateParticles(){
 	std::vector<pharticle::Particle*> particles;
 	
-	int id = 0;
 	for (auto& petal : _petals) {
 		particles.push_back(&petal->particle());
 	}
@@ -192,14 +221,35 @@ void ofApp::updateParticles(){
 		Eigen::Vector3d n = p->position_.normalized();
 		Eigen::Vector3d vis = p->velocity_.dot(n) * n;
 		Eigen::Vector3d force = (500-distance) * n * 0.1 - vis;
-		addForce(*p, force);
+		// addForce(*p, force);
+
+		double gain = 1.5;
+		Eigen::Vector3d noiseLocalPositionEigen = p->position_/500.0 * gain;
+		ofVec3f noiseLocalPosition(noiseLocalPositionEigen[0], noiseLocalPositionEigen[1], noiseLocalPositionEigen[2]);
+		Eigen::Vector3d noiseForce(
+			ofNoise(noiseLocalPosition + ofVec3f(0.5, 0.0, 0.0))-0.5, 
+			ofNoise(noiseLocalPosition + ofVec3f(0.0, 0.5, 0.0))-0.5, 
+			ofNoise(noiseLocalPosition + ofVec3f(0.0, 0.0, 0.5))-0.5
+		);
+		addForce(*p, noiseForce.normalized()*1.0);
+
+		addForce(*p, -p->velocity_*0.01);
+		
 	}
-	
-	// integrate
+
+	//register
+	int id = 0;
 	for (auto&& p : particles) {
-		p->integrate();
-		p->acceleration_ << 0,0,0;
+		p->id_ = id;
+		_engine.add(*p);
+		id++;
 	}
+	_engine.update();
+	// integrate
+	// for (auto&& p : particles) {
+	// 	p->integrate();
+	// 	p->acceleration_ << 0,0,0;
+	// }
 }
 
 void ofApp::drawPetals(){
@@ -228,11 +278,9 @@ void ofApp::drawEmitters(){
 		auto n = emitter->position().normalized();
 		ofQuaternion q;
 		q.makeRotate(ofVec3f(0, -1, 0), n);
-		std::cout<<q<<std::endl;
 		
 		ofVec3f qAxsis;
 		float   angle;
-		// emitter->orientation().getRotate(angle, qAxsis);
 		q.getRotate(angle, qAxsis);
 		ofRotate(angle, qAxsis.x, qAxsis.y, qAxsis.z);
 		
@@ -301,7 +349,7 @@ void ofApp::mouseMoved(int x, int y ){
 }
 
 //--------------------------------------------------------------
-void ofApp::mouseDragged(int x, int y, int button){
+void ofApp::mouseDragged(int x, int y, int buttonfloat ){
 
 }
 
@@ -320,7 +368,9 @@ void ofApp::mousePressed(int x, int y, int button){
 		_asortMaterial,
 		_accentMaterial,
 		randomPoint, 
-		5
+		300, 
+		5,
+		ofRandom(0.4, 4)
 	));
 	_emitters.push_back(emitter);
 }
