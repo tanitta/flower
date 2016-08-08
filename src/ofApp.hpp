@@ -42,7 +42,7 @@ class ofApp : public ofBaseApp{
 		std::vector<std::shared_ptr<flower::Emitter>> _emitters;
 		
 		Eigen::Vector3d _petalsCenter;
-		
+
 		pharticle::Engine _engine;
 		
 		void setupPetals();
@@ -121,7 +121,7 @@ void ofApp::setup(){
 	_glitch.setFx(OFXPOSTGLITCH_CR_HIGHCONTRAST, true);
 	
 	
-	ofSetLineWidth(4);
+	// ofSetLineWidth(4);
 	
 	setupPetals();
 	setupEmitters();
@@ -166,7 +166,8 @@ void ofApp::update(){
 	_camera.begin();
 	// ofBackground(0, 0, 255);
 	
-	ofBackground(128, 128, 255);
+	// ofBackground(128, 128, 255);
+	ofBackground(255);
 	
 	drawPetals();
 	drawEmitters();
@@ -266,6 +267,7 @@ void ofApp::drawPetals(){
 		petal->draw();
 		
 		ofPopMatrix();
+		petal->drawLine();
 	}
 }
 
