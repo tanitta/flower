@@ -9,6 +9,7 @@
 
 #include "flower.hpp"
 #include "emitter.hpp"
+#include "receiver.hpp"
 
 class ofApp : public ofBaseApp{
 	using Material = std::shared_ptr<ofxLitSphere>;
@@ -62,6 +63,7 @@ class ofApp : public ofBaseApp{
 
 //--------------------------------------------------------------
 void ofApp::setup(){
+	flower::Receiver::setup();
 	// _engine.set_collision_reaction_force([&](pharticle::Particle& p1, pharticle::Particle& p2){
 	// 	//separation
 	// 	Eigen::Vector3d separationForce = Eigen::Vector3d(0.0, 0.0, 0.0);
@@ -158,6 +160,8 @@ void ofApp::setupEmitters(){
 }
 //--------------------------------------------------------------
 void ofApp::update(){
+	flower::Receiver::update();
+	
 	updatePetals();
 	updateEmitters();
 	updateParticles();
