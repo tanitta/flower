@@ -46,12 +46,17 @@ class ofApp : public ofBaseApp{
 
 		pharticle::Engine _engine;
 		
+		void bloomEmitter();
+		
 		void setupPetals();
 		void setupEmitters();
 		
+		void updateMaterial();
+		void updateCamera();
 		void updatePetals();
 		void updateEmitters();
 		void updateParticles();
+		void updateEffects();
 		
 		void drawPetals();
 		void drawEmitters();
@@ -59,6 +64,8 @@ class ofApp : public ofBaseApp{
 		void addForce(pharticle::Particle& particle, Eigen::Vector3d force);
 		void addForce(pharticle::Particle& particle, ofVec3f force);
 		double _unitTime = 1.0;
+		
+		bool _bloomed = false;
 };
 
 //--------------------------------------------------------------
@@ -85,6 +92,7 @@ void ofApp::setup(){
 	// 	// return force;
 	// 	return separationForce;
 	// });
+	_camera.disableMouseInput();
 	
     ofEnableDepthTest();
     ofSetVerticalSync(true);
@@ -129,49 +137,31 @@ void ofApp::setup(){
 	setupEmitters();
 }
 
-void ofApp::setupPetals(){
-	// for (int i = 0; i < 6; i++) {
-	// 	auto p = std::shared_ptr<flower::Petal>(new flower::Petal(_baseMaterial));
-	// 	const auto x = ofRandom(-200, 200);
-	// 	const auto y = ofRandom(-200, 200);
-	// 	const auto z = ofRandom(-200, 200);
-	// 	p->position(ofVec3f(x, y, z))
-	//       .orientation(ofQuaternion(ofRandom(-PI, PI)*100.0f, ofVec3f(x, y, z).normalized()));
-	// 	_petals.push_back(p);
-	// }
-	//
-	// flower::Flower flower(_baseMaterial, _asortMaterial, _accentMaterial, _petals);
-}
+void ofApp::setupPetals(){}
 
-void ofApp::setupEmitters(){
-	for (int i = 0; i < 3; i++){
-		auto emitter = std::shared_ptr<flower::Emitter>(new flower::Emitter(
-			_petals,
-			_baseMaterial,
-			_asortMaterial,
-			_accentMaterial,
-			ofVec3f(i*100, 0, 0), 
-			300, 
-			5,
-			1
-		));
-		_emitters.push_back(emitter);
-	}
-}
+void ofApp::setupEmitters(){}
+
 //--------------------------------------------------------------
 void ofApp::update(){
 	flower::Receiver::update();
 	
-	updatePetals();
+	updateMaterial();
 	updateEmitters();
+	updatePetals();
 	updateParticles();
+	updateEffects();
+	updateCamera();
 	
 	_fbo.begin();
 	_camera.begin();
 	// ofBackground(0, 0, 255);
 	
 	// ofBackground(128, 128, 255);
-	ofBackground(255);
+	ofBackground(
+		flower::Receiver::message("/background/r", 255),
+		flower::Receiver::message("/background/g", 255),
+		flower::Receiver::message("/background/b", 255)
+	);
 	
 	drawPetals();
 	drawEmitters();
@@ -179,12 +169,51 @@ void ofApp::update(){
 	_camera.end();
 	_fbo.end();
 }
+void ofApp::updateMaterial(){
+	ofDisableArbTex();
+	_baseMaterial->loadAt(flower::Receiver::message("/material/base", 2));
+	_asortMaterial->loadAt(flower::Receiver::message("/material/asort", 2));
+	_accentMaterial->loadAt(flower::Receiver::message("/material/accent", 12));
+	ofEnableArbTex();
+}
+
+void ofApp::updateCamera(){
+	ofVec3f target;
+	if(_emitters.size()>0 && flower::Receiver::message("/camera/dynamicmode", 1.0f)>0.5f){
+		target = _emitters.back()->position();
+	}else{
+		target = ofVec3f(
+			flower::Receiver::message("/camera/target/x"), 
+			flower::Receiver::message("/camera/target/y"), 
+			flower::Receiver::message("/camera/target/z")
+		);
+	}
+	_camera.orbit(
+		flower::Receiver::message("/camera/orbit/longitude"), 
+		flower::Receiver::message("/camera/orbit/latitude"), 
+		flower::Receiver::message("/camera/orbit/radius", 1000), 
+		target
+		);
+	_camera.setTarget(target);
+
+}
 
 void ofApp::updatePetals(){
+	float lineWidth = flower::Receiver::message("/petal/line/width", 2.0f);
+	ofColor lineStartColor(
+		flower::Receiver::message("/petal/line/start/r", 0.0f), 
+		flower::Receiver::message("/petal/line/start/g", 0.0f), 
+		flower::Receiver::message("/petal/line/start/b", 0.0f)
+	);
+	ofColor lineFinishColor(
+		flower::Receiver::message("/petal/line/finish/r", 0.0f), 
+		flower::Receiver::message("/petal/line/finish/g", 0.0f), 
+		flower::Receiver::message("/petal/line/finish/b", 0.0f)
+	);
 	for (auto&& petal: _petals) {
-		petal->update();
+		petal->update(lineWidth, lineStartColor, lineFinishColor);
 	}
-	
+
 	std::vector<std::shared_ptr<flower::Petal>> petals_tmp;
 	for (auto&& petal: _petals) {
 		if(!petal->shouldDie){
@@ -192,9 +221,24 @@ void ofApp::updatePetals(){
 		}
 	}
 	_petals = petals_tmp;
+	
+	if(flower::Receiver::message("/petal/clear")>0.5f){
+		_petals.clear();
+	}
 }
 
 void ofApp::updateEmitters(){
+	if(!_bloomed){
+		if(flower::Receiver::message("/emitter/bloom")>0.5f){
+			bloomEmitter();
+			_bloomed = true;
+		}
+	}else{
+		if(flower::Receiver::message("/emitter/bloom")<0.5f){
+			_bloomed = false;
+		}
+	}
+	
 	for (auto&& emitter: _emitters) {
 		emitter->update();
 	}
@@ -208,6 +252,9 @@ void ofApp::updateEmitters(){
 	_emitters = emitters_tmp;
 	
 	
+	if(flower::Receiver::message("/emitter/clear")>0.5f){
+		_emitters.clear();
+	}
 }
 
 void ofApp::updateParticles(){
@@ -221,43 +268,77 @@ void ofApp::updateParticles(){
 		particles.push_back(&emitter->particle());
 	}
 	
+	double sphereRadius= flower::Receiver::message("/particle/sphere/radius", 500.0f);
+	double sphereGain = flower::Receiver::message("/particle/sphere/gain", 1.0f);
+	double noiseFreq= flower::Receiver::message("/particle/noise/freq", 1.5f);
+	double noiseGain = flower::Receiver::message("/particle/noise/gain", 1.0f);
+	double viscosity = flower::Receiver::message("/particle/viscosity", 0.01f);
+	Eigen::Vector3d flow(
+		flower::Receiver::message("/particle/flow/x"),
+		flower::Receiver::message("/particle/flow/y"),
+		flower::Receiver::message("/particle/flow/z")
+	);
 	for (auto&& p : particles) {
 		double distance = p->position_.norm();
 		Eigen::Vector3d n = p->position_.normalized();
 		Eigen::Vector3d vis = p->velocity_.dot(n) * n;
-		Eigen::Vector3d force = (500-distance) * n * 0.1 - vis;
-		// addForce(*p, force);
+		Eigen::Vector3d force = (sphereRadius-distance) * n * 0.1 - vis;
+		addForce(*p, force*sphereGain);
 
-		double gain = 1.5;
-		Eigen::Vector3d noiseLocalPositionEigen = p->position_/500.0 * gain;
+		Eigen::Vector3d noiseLocalPositionEigen = p->position_/500.0 * noiseFreq;
 		ofVec3f noiseLocalPosition(noiseLocalPositionEigen[0], noiseLocalPositionEigen[1], noiseLocalPositionEigen[2]);
 		Eigen::Vector3d noiseForce(
 			ofNoise(noiseLocalPosition + ofVec3f(0.5, 0.0, 0.0))-0.5, 
 			ofNoise(noiseLocalPosition + ofVec3f(0.0, 0.5, 0.0))-0.5, 
 			ofNoise(noiseLocalPosition + ofVec3f(0.0, 0.0, 0.5))-0.5
 		);
-		addForce(*p, noiseForce.normalized()*1.0);
+		addForce(*p, noiseForce.normalized()*noiseGain);
 
-		addForce(*p, -p->velocity_*0.01);
+		addForce(*p, -p->velocity_ * viscosity);
 		
+		addForce(*p, flow);
 	}
 
-	//register
-	int id = 0;
-	for (auto&& p : particles) {
-		p->id_ = id;
-		_engine.add(*p);
-		id++;
+	bool usingPharticle = flower::Receiver::message("/particle/usingpharticle") > 0.5f;
+	if(usingPharticle){
+		int id = 0;
+		for (auto&& p : particles) {
+			p->id_ = id;
+			_engine.add(*p);
+			id++;
+		}
+		_engine.update();
+	}else{
+		for (auto&& p : particles) {
+			p->integrate();
+			p->acceleration_ << 0,0,0;
+		}
 	}
-	_engine.update();
-	// integrate
-	// for (auto&& p : particles) {
-	// 	p->integrate();
-	// 	p->acceleration_ << 0,0,0;
-	// }
+}
+
+void ofApp::updateEffects(){
+	_glitch.setFx(OFXPOSTGLITCH_CONVERGENCE, flower::Receiver::message("/effect/convergence") > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_GLOW,        flower::Receiver::message("/effect/glow")        > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_SHAKER,      flower::Receiver::message("/effect/shaker")      > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_CUTSLIDER,   flower::Receiver::message("/effect/cutslider")   > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_TWIST,       flower::Receiver::message("/effect/twist")       > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_OUTLINE,     flower::Receiver::message("/effect/outline")     > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_NOISE,       flower::Receiver::message("/effect/noise")       > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_SLITSCAN,    flower::Receiver::message("/effect/slitscan")    > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_SWELL,       flower::Receiver::message("/effect/swell")       > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_INVERT,      flower::Receiver::message("/effect/invert")      > 0.5f );
+
+	_glitch.setFx(OFXPOSTGLITCH_CR_HIGHCONTRAST, flower::Receiver::message("/effect/highcontrast") > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_CR_BLUERAISE,    flower::Receiver::message("/effect/blueraise")    > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_CR_REDRAISE,     flower::Receiver::message("/effect/redraise")     > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_CR_GREENRAISE,   flower::Receiver::message("/effect/greenraise")   > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_CR_BLUEINVERT,   flower::Receiver::message("/effect/blueinvert")   > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_CR_REDINVERT,    flower::Receiver::message("/effect/redinvert")    > 0.5f );
+	_glitch.setFx(OFXPOSTGLITCH_CR_GREENINVERT,  flower::Receiver::message("/effect/greeninvert")  > 0.5f );
 }
 
 void ofApp::drawPetals(){
+	bool isDrawingFaces = flower::Receiver::message("/petal/isdrawingfaces", 1.0f)>0.5f;
 	for (auto&& petal : _petals) {
 		ofPushMatrix();
 		
@@ -268,7 +349,7 @@ void ofApp::drawPetals(){
 		petal->orientation().getRotate(angle, qAxsis);
 		ofRotate(angle, qAxsis.x, qAxsis.y, qAxsis.z);
 		
-		petal->draw();
+		petal->draw(isDrawingFaces);
 		
 		ofPopMatrix();
 		petal->drawLine();
@@ -276,6 +357,8 @@ void ofApp::drawPetals(){
 }
 
 void ofApp::drawEmitters(){
+	bool isDrawingFaces = flower::Receiver::message("/emitter/isdrawingfaces", 1.0f)>0.5f;
+	ofSetColor(255, 0, 0);
 	for (auto&& emitter: _emitters) {
 		ofPushMatrix();
 		
@@ -290,7 +373,7 @@ void ofApp::drawEmitters(){
 		q.getRotate(angle, qAxsis);
 		ofRotate(angle, qAxsis.x, qAxsis.y, qAxsis.z);
 		
-		emitter->draw();
+		emitter->draw(isDrawingFaces);
 		
 		ofPopMatrix();
 	}
@@ -367,18 +450,7 @@ void ofApp::mousePressed(int x, int y, int button){
 	// flower::addFlower(_petals, _baseMaterial, _asortMaterial, _accentMaterial, ofVec3f(ofRandom(-500, 500), ofRandom(-500, 500), ofRandom(-500, 500)), 5);
 	// _emitters.push_back();
 	
-	ofVec3f randomPoint(ofRandom(-500, 500), ofRandom(-500, 500), ofRandom(-500, 500));
-	auto emitter = std::shared_ptr<flower::Emitter>(new flower::Emitter(
-		_petals,
-		_baseMaterial,
-		_asortMaterial,
-		_accentMaterial,
-		randomPoint, 
-		300, 
-		5,
-		ofRandom(0.4, 4)
-	));
-	_emitters.push_back(emitter);
+	bloomEmitter();
 }
 
 //--------------------------------------------------------------
@@ -421,6 +493,26 @@ void ofApp::addForce(pharticle::Particle& particle, ofVec3f force){
 	addForce(particle, Eigen::Vector3d(force.x, force.y, force.z));
 }
 
+void ofApp::bloomEmitter(){
+	float size = ofRandom(
+		flower::Receiver::message("/emitter/size/min", 0.4),
+		flower::Receiver::message("/emitter/size/max", 4.0)
+	);
+	float bloomingRange = flower::Receiver::message("/emitter/bloomingrange", 200);
+	ofVec3f randomPoint(ofRandom(-bloomingRange, bloomingRange), ofRandom(-bloomingRange, bloomingRange), ofRandom(-bloomingRange, bloomingRange));
+	auto emitter = std::shared_ptr<flower::Emitter>(new flower::Emitter(
+		_petals,
+		_baseMaterial,
+		_asortMaterial,
+		_accentMaterial,
+		randomPoint, 
+		flower::Receiver::message("/emitter/age", 300), 
+		flower::Receiver::message("/emitter/numpetals", 5), 
+		size, 
+		flower::Receiver::message("/petal/age", 100)
+	));
+	_emitters.push_back(emitter);
+}
 // namespace flower {
 // namespace boids {
 // 	Eigen::Vector3d separation(pharticle::Particle& p1, pharticle::Particle& p2, double distance){

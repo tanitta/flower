@@ -18,11 +18,12 @@ class Petal {
 		};
 		virtual ~Petal(){};
 
-		void update(){
+		void update(const float& lineWidth, const ofColor& start, const ofColor& finish){
 			if(_age>0){
 				if(int(_age)%2 == 0){
-					_line.setStrokeColor( ofColor( 255.0-220.0*_age/_maxAge ) );
-					_line.setStrokeWidth( 5.0*_age/_maxAge+1.0 );
+					// _line.setStrokeColor( ofColor( 255.0-220.0*_age/_maxAge ) );
+					_line.setStrokeColor( start*(_age/_maxAge) + finish*(1.0f - _age/_maxAge));
+					_line.setStrokeWidth( lineWidth*(_age/_maxAge));
 					_line.lineTo(_particle.position_[0], _particle.position_[1], _particle.position_[2]);
 				}
 			
@@ -32,10 +33,17 @@ class Petal {
 			}
 		}
 
-		void draw(){
+		void draw(const bool& isDrawingFaces){
 			_material->begin();
-			flower::Resources::elem("petal.x")->drawFaces();
-			// flower::Resources::elem("petal.x")->drawWireframe();
+			ofPushMatrix();
+			float scale = _age/_maxAge;
+			ofScale(scale, scale, scale);
+			if(isDrawingFaces){
+				flower::Resources::elem("petal.x")->drawFaces();
+			}else{
+				flower::Resources::elem("petal.x")->drawWireframe();
+			}
+			ofPopMatrix();
 			// ofDrawAxis(100.0f);
 			_material->end();
 		}

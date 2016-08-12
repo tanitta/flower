@@ -17,13 +17,13 @@ namespace flower {
 		}
 	};
 	
-	float Receiver::message(const std::string& address){
+	float Receiver::message(const std::string& address, const float& def){
 		auto itr = _messages.find(address);
 		if( itr != _messages.end() ) {
 			return _messages[address];
 		} else {
-			std::cout<<"Warning : "<<address<<"is not found"<<std::endl;
-			return 0.0f;
+			std::cout<<"Warning : "<<address<<" is not found"<<std::endl;
+			return def;
 		}
 	};
 	

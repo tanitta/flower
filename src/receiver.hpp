@@ -10,7 +10,7 @@ namespace flower {
 			
 			static void setup();
 			static void update();
-			static float message(const std::string& address);
+			static float message(const std::string& address, const float& def = 0.0f);
 			
 		private:
 			static ofxOscReceiver  _receiver;

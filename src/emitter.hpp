@@ -15,8 +15,9 @@ class Emitter {
 			ofVec3f position, 
 			double age, 
 			size_t numPetals, 
-			float size
-		):_petals(petals), _age(age){
+			float size,
+			float petalAge
+		):_petals(petals), _age(age), _maxAge(age), _petalMaxAge(petalAge){
 			// flower::Flower flower(base, asort, accent, position, _drawingPetals);
 			this->position(position);
 			_size = size;
@@ -29,7 +30,7 @@ class Emitter {
 				numPetals
 			);
 			
-			_petalMaterial = accent;
+			_petalMaterial = asort;
 		};
 		
 		virtual ~Emitter(){};
@@ -42,7 +43,7 @@ class Emitter {
 			
 			if(_age>0){
 				if(int(_age)%4 == 0){
-					auto p = std::shared_ptr<flower::Petal>(new flower::Petal(_petalMaterial, 100));
+					auto p = std::shared_ptr<flower::Petal>(new flower::Petal(_petalMaterial, _petalMaxAge));
 					const auto x = ofRandom(-5, 5);
 					const auto y = ofRandom(-5, 5);
 					const auto z = ofRandom(-5, 5);
@@ -57,17 +58,18 @@ class Emitter {
 			}
 		}
 		
-		void draw(){
+		void draw(const bool& isDrawingFaces){
+			float scale = _age/_maxAge;
 			for (auto&& petal : _drawingPetals) {
 				ofPushMatrix();
-				ofScale(_size, _size, _size);
+				ofScale(_size*scale, _size*scale, _size*scale);
 				ofTranslate(petal->position());
 				ofVec3f qAxsis;
 				float   angle;
 				petal->orientation().getRotate(angle, qAxsis);
 				ofRotate(angle, qAxsis.x, qAxsis.y, qAxsis.z);
 
-				petal->draw();
+				petal->draw(isDrawingFaces);
 
 				ofPopMatrix();
 			}
@@ -100,6 +102,8 @@ class Emitter {
 		ofQuaternion _orientation;
 		double _size;
 		double _age;
+		double _maxAge;
+		double _petalMaxAge;
 		
 		Material _petalMaterial;
 };
